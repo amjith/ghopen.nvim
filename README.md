@@ -22,7 +22,7 @@ Open a file in vim then try:
 
 or 
 
-<leader>go
+`<leader>go`
 
 Opens the file in github.com (comptaible with Github Enterprise).
 
