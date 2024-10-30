@@ -16,7 +16,8 @@ function M.open_in_github()
 	local branch = vim.fn.system("git -C " .. git_root .. " rev-parse --abbrev-ref HEAD"):gsub("\n", "")
 
 	-- Get the remote URL
-	local remote_url = vim.fn.system("git -C " .. git_root .. " config --get remote.origin.url"):gsub("\n", "")
+	-- local remote_url = vim.fn.system("git ls-remote --get-url origin"):gsub("\n", "")
+	local remote_url = vim.fn.system("git -C " .. git_root .. " ls-remote --get-url origin"):gsub("\n", "")
 
 	-- Extract the host, username, and repository name
 	local host, user, repo
@@ -34,9 +35,32 @@ function M.open_in_github()
 		return
 	end
 
+	-- Get the current mode
+	local mode = vim.api.nvim_get_mode().mode
+
+	-- Get the line numbers for highlighting
+	local start_line, end_line
+	if mode == "v" or mode == "V" or mode == "" then
+		-- Visual mode
+		start_line = vim.fn.line("'<")
+		end_line = vim.fn.line("'>")
+	else
+		-- Normal mode
+		start_line = vim.fn.line(".")
+		end_line = start_line
+	end
+
 	-- Construct the GitHub-style URL
-	local github_url =
-		string.format("https://%s/%s/%s/blob/%s/%s", host, user, repo, branch, file_path:sub(#git_root + 2))
+	local github_url = string.format(
+		"https://%s/%s/%s/blob/%s/%s#L%d-L%d",
+		host,
+		user,
+		repo,
+		branch,
+		file_path:sub(#git_root + 2),
+		start_line,
+		end_line
+	)
 
 	-- Open the URL in the default browser
 	local open_cmd
@@ -56,11 +80,20 @@ end
 
 function M.setup(opts)
 	opts = opts or {}
-	-- Create a command to call the function
-	vim.api.nvim_create_user_command("Ghopen", M.open_in_github, {})
+	local keymap = opts.keymap or "<leader>go"
 
-	-- Optionally, add a keybinding
-	vim.keymap.set("n", "<leader>go", ":Ghopen<CR>", { noremap = true, silent = true })
+	-- Create a command to call the function
+	vim.api.nvim_create_user_command("Ghopen", function(cmd_opts)
+		-- If there's a range, set the visual selection
+		if cmd_opts.range > 0 then
+			vim.cmd(string.format("normal! %dGV%dG", cmd_opts.line1, cmd_opts.line2))
+		end
+		M.open_in_github()
+	end, { range = true })
+
+	-- Add keybindings for normal and visual modes
+	vim.keymap.set("n", keymap, ":Ghopen<CR>", { noremap = true, silent = true })
+	vim.keymap.set("v", keymap, ":Ghopen<CR>", { noremap = true, silent = true })
 end
 
 return M
