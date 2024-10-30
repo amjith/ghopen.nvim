@@ -57,10 +57,10 @@ end
 function M.setup(opts)
 	opts = opts or {}
 	-- Create a command to call the function
-	vim.api.nvim_create_user_command("ghopen", M.open_in_github, {})
+	vim.api.nvim_create_user_command("Ghopen", M.open_in_github, {})
 
 	-- Optionally, add a keybinding
-	vim.keymap.set("n", "<leader>go", ":ghopen<CR>", { noremap = true, silent = true })
+	vim.keymap.set("n", "<leader>go", ":Ghopen<CR>", { noremap = true, silent = true })
 end
 
 return M
