@@ -1,5 +1,5 @@
 # ghopen.nvim
- 
+
 NeoVim Plugin to open current file in the GH UI (github.com or Github Enterprise).
 
 ## Installation
@@ -9,6 +9,7 @@ LazyVim:
 ```lua
 {
   "amjith/ghopen.nvim",
+  opts = {}
 }
 ```
 
@@ -20,7 +21,7 @@ Open a file in vim then try:
 :Ghopen
 ```
 
-or 
+or
 
 `<leader>go`
 
