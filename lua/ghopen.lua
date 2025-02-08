@@ -1,6 +1,14 @@
 local M = {}
 
-function M.open_in_github()
+function M.get_default_branch(git_root)
+	local default_branch = vim.fn.system("git -C " .. git_root .. " symbolic-ref refs/remotes/origin/HEAD"):gsub("\n", "")
+	if vim.v.shell_error ~= 0 or default_branch == "" then
+		return "main" -- fallback if unable to detect
+	end
+	return default_branch:match("origin/(.+)") or "main"
+end
+
+function M.open_in_github(branch_override)
 	-- Get the current file path
 	local file_path = vim.fn.expand("%:p")
 
@@ -12,11 +20,13 @@ function M.open_in_github()
 		return
 	end
 
-	-- Get the current branch
-	local branch = vim.fn.system("git -C " .. git_root .. " rev-parse --abbrev-ref HEAD"):gsub("\n", "")
+	-- Get the current branch or use the override
+	local branch = branch_override or vim.fn.system("git -C " .. git_root .. " rev-parse --abbrev-ref HEAD"):gsub("\n", "")
+	if branch_override == "default" then
+		branch = M.get_default_branch(git_root)
+	end
 
 	-- Get the remote URL
-	-- local remote_url = vim.fn.system("git ls-remote --get-url origin"):gsub("\n", "")
 	local remote_url = vim.fn.system("git -C " .. git_root .. " ls-remote --get-url origin"):gsub("\n", "")
 
 	-- Extract the host, username, and repository name
@@ -51,16 +61,34 @@ function M.open_in_github()
 	end
 
 	-- Construct the GitHub-style URL
+	local line_fragment
+	if start_line == end_line then
+		line_fragment = string.format("#L%d", start_line)
+	else
+		line_fragment = string.format("#L%d-L%d", start_line, end_line)
+	end
+
 	local github_url = string.format(
-		"https://%s/%s/%s/blob/%s/%s#L%d-L%d",
+		"https://%s/%s/%s/blob/%s/%s%s",
 		host,
 		user,
 		repo,
 		branch,
 		file_path:sub(#git_root + 2),
-		start_line,
-		end_line
+		line_fragment
 	)
+
+	-- Copy URL to clipboard
+	if vim.fn.has("mac") == 1 then
+		vim.fn.system("pbcopy", github_url)
+	elseif vim.fn.has("unix") == 1 then
+		vim.fn.system("xclip -selection clipboard", github_url)
+	elseif vim.fn.has("win32") == 1 then
+		vim.fn.system("clip", github_url)
+	else
+		print("Unsupported operating system")
+		return
+	end
 
 	-- Open the URL in the default browser
 	local open_cmd
@@ -81,8 +109,9 @@ end
 function M.setup(opts)
 	opts = opts or {}
 	local keymap = opts.keymap or "<leader>go"
+	local keymap_default = opts.keymap_default or "<leader>gd"
 
-	-- Create a command to call the function
+	-- Create commands to call the functions
 	vim.api.nvim_create_user_command("Ghopen", function(cmd_opts)
 		-- If there's a range, set the visual selection
 		if cmd_opts.range > 0 then
@@ -91,9 +120,18 @@ function M.setup(opts)
 		M.open_in_github()
 	end, { range = true })
 
+	vim.api.nvim_create_user_command("GhopenDefault", function(cmd_opts)
+		if cmd_opts.range > 0 then
+			vim.cmd(string.format("normal! %dGV%dG", cmd_opts.line1, cmd_opts.line2))
+		end
+		M.open_in_github("default")
+	end, { range = true })
+
 	-- Add keybindings for normal and visual modes
 	vim.keymap.set("n", keymap, ":Ghopen<CR>", { noremap = true, silent = true })
 	vim.keymap.set("v", keymap, ":Ghopen<CR>", { noremap = true, silent = true })
+	vim.keymap.set("n", keymap_default, ":GhopenDefault<CR>", { noremap = true, silent = true })
+	vim.keymap.set("v", keymap_default, ":GhopenDefault<CR>", { noremap = true, silent = true })
 end
 
 return M
